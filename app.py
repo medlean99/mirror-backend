@@ -16,6 +16,7 @@ def upload():
     submitter_name = request.form.get("submitter_name", "").strip()
     submitter_email = request.form.get("submitter_email", "").strip()
     password = request.form.get("password", "").strip()
+    notes = request.form.get("notes", "").strip()
 
     if not submitter_name:
         return jsonify({"status": "error", "message": "Full name is required"}), 400
@@ -31,6 +32,9 @@ def upload():
 
     if not UPLOAD_PASSWORD or password != UPLOAD_PASSWORD:
         return jsonify({"status": "error", "message": "Invalid password"}), 403
+
+    if not notes:
+        return jsonify({"status": "error", "message": "Description is required"}), 400
 
     if "files" not in request.files:
         return jsonify({"status": "error", "message": "No files provided"}), 400
