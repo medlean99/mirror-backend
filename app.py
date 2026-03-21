@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 from datetime import datetime
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -10,6 +11,51 @@ UPLOAD_FOLDER = "/tmp/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "")
+MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "").strip()
+MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "").strip()
+NOTIFY_EMAIL_TO = os.environ.get("NOTIFY_EMAIL_TO", "rick@ignitelongevity.com").strip()
+NOTIFY_EMAIL_FROM = os.environ.get("NOTIFY_EMAIL_FROM", "").strip()
+
+def send_notification_email(submitter_name, submitter_email, destination, notes, saved_files):
+    if not MAILGUN_API_KEY or not MAILGUN_DOMAIN or not NOTIFY_EMAIL_FROM:
+        return {
+            "sent": False,
+            "reason": "mailgun_not_configured"
+        }
+
+    subject = f"Mirror upload received: {destination}"
+    body = (
+        f"Mirror upload received.\n\n"
+        f"Name: {submitter_name}\n"
+        f"Email: {submitter_email}\n"
+        f"Destination: {destination}\n"
+        f"Description: {notes}\n"
+        f"Files: {', '.join(saved_files)}\n"
+        f"Timestamp UTC: {datetime.utcnow().isoformat()}\n"
+    )
+
+    try:
+        response = requests.post(
+            f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
+            auth=("api", MAILGUN_API_KEY),
+            data={
+                "from": NOTIFY_EMAIL_FROM,
+                "to": [NOTIFY_EMAIL_TO],
+                "subject": subject,
+                "text": body,
+            },
+            timeout=20,
+        )
+
+        return {
+            "sent": response.ok,
+            "status_code": response.status_code
+        }
+    except Exception as e:
+        return {
+            "sent": False,
+            "reason": str(e)
+        }
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
@@ -17,6 +63,7 @@ def upload():
     submitter_email = request.form.get("submitter_email", "").strip()
     password = request.form.get("password", "").strip()
     notes = request.form.get("notes", "").strip()
+    destination = request.form.get("destination", "").strip()
 
     if not submitter_name:
         return jsonify({"status": "error", "message": "Full name is required"}), 400
@@ -55,8 +102,17 @@ def upload():
     if not saved:
         return jsonify({"status": "error", "message": "No valid files uploaded"}), 400
 
+    email_result = send_notification_email(
+        submitter_name=submitter_name,
+        submitter_email=submitter_email,
+        destination=destination,
+        notes=notes,
+        saved_files=saved,
+    )
+
     return jsonify({
         "status": "ok",
-        "message": "files saved",
-        "files": saved
+        "message": "Submission received successfully. Your file was accepted and placed in intake.",
+        "files": saved,
+        "notification": email_result,
     })
