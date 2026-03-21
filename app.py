@@ -1,9 +1,8 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
-CORS(app)
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
-    return jsonify({"status": "ok", "message": "test response"})
+    print("REQUEST HIT")
+    return "OK", 200
