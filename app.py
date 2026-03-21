@@ -1,12 +1,15 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import os
 from datetime import datetime
 import json
 
 app = Flask(__name__)
+CORS(app)
 
 UPLOAD_FOLDER = "incoming/quarantine"
 LOG_FILE = "upload_log.jsonl"
+UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "")
 
 ALLOWED_EXTENSIONS = {"mp4", "mov", "webm", "wav", "mp3"}
 
@@ -21,11 +24,24 @@ def log_upload(data):
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
-    destination = request.form.get("destination", "")
-    submitter_name = request.form.get("submitter_name", "")
-    submitter_email = request.form.get("submitter_email", "")
-    notes = request.form.get("notes", "")
-    submitted_at = request.form.get("submitted_at", "")
+    destination = request.form.get("destination", "").strip()
+    submitter_name = request.form.get("submitter_name", "").strip()
+    submitter_email = request.form.get("submitter_email", "").strip()
+    password = request.form.get("password", "").strip()
+    notes = request.form.get("notes", "").strip()
+    submitted_at = request.form.get("submitted_at", "").strip()
+
+    if not submitter_name:
+        return jsonify({"status": "error", "message": "Submitter name is required"}), 400
+
+    if not submitter_email:
+        return jsonify({"status": "error", "message": "Email is required"}), 400
+
+    if not password:
+        return jsonify({"status": "error", "message": "Password is required"}), 400
+
+    if not UPLOAD_PASSWORD or password != UPLOAD_PASSWORD:
+        return jsonify({"status": "error", "message": "Invalid password"}), 403
 
     if "files" not in request.files:
         return jsonify({"status": "error", "message": "No files provided"}), 400
@@ -45,6 +61,9 @@ def upload():
 
         file.save(filepath)
         saved_files.append(filename)
+
+    if not saved_files:
+        return jsonify({"status": "error", "message": "No valid files uploaded"}), 400
 
     log_entry = {
         "timestamp": datetime.utcnow().isoformat(),
