@@ -26,8 +26,11 @@ def append_manifest_record(record):
         f.write(json.dumps(record) + "\n")
 
 def is_admin(request):
-    token = request.headers.get("x-admin-token", "")
-    print("HEADER TOKEN:", repr(token))
+    header_token = request.headers.get("x-admin-token", "")
+    query_token = request.args.get("admin_token", "")
+    token = header_token or query_token
+    print("HEADER TOKEN:", repr(header_token))
+    print("QUERY TOKEN:", repr(query_token))
     print("ENV TOKEN:", repr(ADMIN_TOKEN))
     return token and token == ADMIN_TOKEN
 
