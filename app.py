@@ -27,6 +27,8 @@ def append_manifest_record(record):
 
 def is_admin(request):
     token = request.headers.get("x-admin-token", "")
+    print("HEADER TOKEN:", repr(token))
+    print("ENV TOKEN:", repr(ADMIN_TOKEN))
     return token and token == ADMIN_TOKEN
 
 @app.route("/api/intake/list", methods=["GET"])
