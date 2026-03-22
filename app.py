@@ -7,7 +7,7 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-UPLOAD_FOLDER = "/tmp/uploads"
+UPLOAD_FOLDER = "/var/data/mirror_intake/quarantine"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "")
