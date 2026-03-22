@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+import json
 from datetime import datetime
 import requests
 
@@ -8,6 +9,8 @@ app = Flask(__name__)
 CORS(app)
 
 UPLOAD_FOLDER = "/var/data/mirror_intake/quarantine"
+MANIFEST_FILE = "/var/data/mirror_intake/upload_manifest.jsonl"
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "")
@@ -15,6 +18,10 @@ MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "").strip()
 MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "").strip()
 NOTIFY_EMAIL_TO = os.environ.get("NOTIFY_EMAIL_TO", "rick@ignitelongevity.com").strip()
 NOTIFY_EMAIL_FROM = os.environ.get("NOTIFY_EMAIL_FROM", "").strip()
+
+def append_manifest_record(record):
+    with open(MANIFEST_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
 
 def send_notification_email(submitter_name, submitter_email, destination, notes, saved_files):
     if not MAILGUN_API_KEY or not MAILGUN_DOMAIN or not NOTIFY_EMAIL_FROM:
@@ -101,6 +108,16 @@ def upload():
 
     if not saved:
         return jsonify({"status": "error", "message": "No valid files uploaded"}), 400
+
+    manifest_record = {
+        "timestamp_utc": datetime.utcnow().isoformat(),
+        "submitter_name": submitter_name,
+        "submitter_email": submitter_email,
+        "destination": destination,
+        "notes": notes,
+        "saved_files": saved
+    }
+    append_manifest_record(manifest_record)
 
     email_result = send_notification_email(
         submitter_name=submitter_name,
