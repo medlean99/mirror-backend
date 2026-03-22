@@ -25,14 +25,11 @@ def append_manifest_record(record):
     with open(MANIFEST_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
 
-def is_admin(request):
-    header_token = request.headers.get("x-admin-token", "")
-    query_token = request.args.get("admin_token", "")
+def is_admin(req):
+    header_token = req.headers.get("x-admin-token", "")
+    query_token = req.args.get("admin_token", "")
     token = header_token or query_token
-    print("HEADER TOKEN:", repr(header_token))
-    print("QUERY TOKEN:", repr(query_token))
-    print("ENV TOKEN:", repr(ADMIN_TOKEN))
-    return token and token == ADMIN_TOKEN
+    return bool(token) and token == ADMIN_TOKEN
 
 @app.route("/api/intake/list", methods=["GET"])
 def list_intake():
@@ -45,7 +42,7 @@ def list_intake():
         "files": files
     })
 
-@app.route("/api/intake/download/<filename>", methods=["GET"])
+@app.route("/api/intake/download/<path:filename>", methods=["GET"])
 def download_file(filename):
     if not is_admin(request):
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
