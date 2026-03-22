@@ -49,7 +49,7 @@ def download_file(filename):
 
     return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
 
-def send_notification_email(submitter_name, submitter_email, destination, notes, saved_files):
+def send_notification_email(submitter_name, submitter_email, destination, notes, saved_files, submission_id):
     if not MAILGUN_API_KEY or not MAILGUN_DOMAIN or not NOTIFY_EMAIL_FROM:
         return {
             "sent": False,
@@ -59,6 +59,7 @@ def send_notification_email(submitter_name, submitter_email, destination, notes,
     subject = f"Mirror upload received: {destination}"
     body = (
         f"Mirror upload received.\n\n"
+        f"Submission ID: {submission_id}\n"
         f"Name: {submitter_name}\n"
         f"Email: {submitter_email}\n"
         f"Destination: {destination}\n"
@@ -122,11 +123,14 @@ def upload():
     files = request.files.getlist("files")
     saved = []
 
-    for file in files:
+    # create submission id once per upload
+    submission_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+    for idx, file in enumerate(files, start=1):
         if file.filename == "":
             continue
 
-        filename = f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
+        filename = f"{submission_id}_{idx:02d}_{file.filename}"
         path = os.path.join(UPLOAD_FOLDER, filename)
 
         file.save(path)
@@ -136,6 +140,7 @@ def upload():
         return jsonify({"status": "error", "message": "No valid files uploaded"}), 400
 
     manifest_record = {
+        "submission_id": submission_id,
         "timestamp_utc": datetime.utcnow().isoformat(),
         "submitter_name": submitter_name,
         "submitter_email": submitter_email,
@@ -151,11 +156,13 @@ def upload():
         destination=destination,
         notes=notes,
         saved_files=saved,
+        submission_id=submission_id
     )
 
     return jsonify({
         "status": "ok",
         "message": "Submission received successfully. Your file was accepted and placed in intake.",
+        "submission_id": submission_id,
         "files": saved,
         "notification": email_result,
     })
