@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import json
@@ -14,6 +14,8 @@ MANIFEST_FILE = "/var/data/mirror_intake/upload_manifest.jsonl"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "")
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
+
 MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "").strip()
 MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "").strip()
 NOTIFY_EMAIL_TO = os.environ.get("NOTIFY_EMAIL_TO", "rick@ignitelongevity.com").strip()
@@ -22,6 +24,28 @@ NOTIFY_EMAIL_FROM = os.environ.get("NOTIFY_EMAIL_FROM", "").strip()
 def append_manifest_record(record):
     with open(MANIFEST_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
+
+def is_admin(request):
+    token = request.headers.get("x-admin-token", "")
+    return token and token == ADMIN_TOKEN
+
+@app.route("/api/intake/list", methods=["GET"])
+def list_intake():
+    if not is_admin(request):
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    files = sorted(os.listdir(UPLOAD_FOLDER))
+    return jsonify({
+        "status": "ok",
+        "files": files
+    })
+
+@app.route("/api/intake/download/<filename>", methods=["GET"])
+def download_file(filename):
+    if not is_admin(request):
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
 
 def send_notification_email(submitter_name, submitter_email, destination, notes, saved_files):
     if not MAILGUN_API_KEY or not MAILGUN_DOMAIN or not NOTIFY_EMAIL_FROM:
